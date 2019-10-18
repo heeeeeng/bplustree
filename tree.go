@@ -27,7 +27,7 @@ func (bt *BTree) First() *leafNode {
 }
 
 // insert inserts a (key, value) into the B+ tree
-func (bt *BTree) Insert(key int, value string) {
+func (bt *BTree) Insert(key []byte, value []byte) {
 	_, oldIndex, leaf := search(bt.root, key)
 	p := leaf.parent()
 
@@ -79,15 +79,15 @@ func (bt *BTree) Insert(key int, value string) {
 // Search searches the key in B+ tree
 // If the key exists, it returns the value of key and true
 // If the key does not exist, it returns an empty string and false
-func (bt *BTree) Search(key int) (string, bool) {
+func (bt *BTree) Search(key []byte) ([]byte, bool) {
 	kv, _, _ := search(bt.root, key)
 	if kv == nil {
-		return "", false
+		return nil, false
 	}
 	return kv.value, true
 }
 
-func search(n node, key int) (*kv, int, *leafNode) {
+func search(n node, key []byte) (*kv, int, *leafNode) {
 	curr := n
 	oldIndex := -1
 

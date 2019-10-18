@@ -6,7 +6,7 @@ const (
 )
 
 type node interface {
-	find(key int) (int, bool)
+	find(key []byte) (int, bool)
 	parent() *interiorNode
 	setParent(*interiorNode)
 	full() bool

@@ -1,11 +1,12 @@
 package bplustree
 
 import (
+	"bytes"
 	"sort"
 )
 
 type kc struct {
-	key   int
+	key   []byte
 	child node
 }
 
@@ -17,15 +18,8 @@ func (a *kcs) Len() int { return len(a) }
 func (a *kcs) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 
 func (a *kcs) Less(i, j int) bool {
-	if a[i].key == 0 {
-		return false
-	}
-
-	if a[j].key == 0 {
-		return true
-	}
-
-	return a[i].key < a[j].key
+	compare := bytes.Compare(a[i].key, a[j].key)
+	return compare > 0
 }
 
 type interiorNode struct {
@@ -46,8 +40,8 @@ func newInteriorNode(p *interiorNode, largestChild node) *interiorNode {
 	return i
 }
 
-func (in *interiorNode) find(key int) (int, bool) {
-	c := func(i int) bool { return in.kcs[i].key > key }
+func (in *interiorNode) find(key []byte) (int, bool) {
+	c := func(i int) bool { return bytes.Compare(in.kcs[i].key, key) > 0 }
 
 	i := sort.Search(in.count-1, c)
 
@@ -60,7 +54,7 @@ func (in *interiorNode) parent() *interiorNode { return in.p }
 
 func (in *interiorNode) setParent(p *interiorNode) { in.p = p }
 
-func (in *interiorNode) insert(key int, child node) (int, *interiorNode, bool) {
+func (in *interiorNode) insert(key []byte, child node) ([]byte, *interiorNode, bool) {
 	i, _ := in.find(key)
 
 	if !in.full() {
@@ -84,7 +78,7 @@ func (in *interiorNode) insert(key int, child node) (int, *interiorNode, bool) {
 	return midKey, next, true
 }
 
-func (in *interiorNode) split() (*interiorNode, int) {
+func (in *interiorNode) split() (*interiorNode, []byte) {
 	sort.Sort(&in.kcs)
 
 	// get the mid info

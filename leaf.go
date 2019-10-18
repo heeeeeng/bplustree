@@ -2,19 +2,20 @@ package bplustree
 
 import (
 	//"log"
+	"bytes"
 	"sort"
 )
 
 type kv struct {
-	key   int
-	value string
+	key   []byte
+	value []byte
 }
 
 type kvs [MaxKV]kv
 
 func (a *kvs) Len() int           { return len(a) }
 func (a *kvs) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a *kvs) Less(i, j int) bool { return a[i].key < a[j].key }
+func (a *kvs) Less(i, j int) bool { return bytes.Compare(a[i].key, a[j].key) > 0 }
 
 type leafNode struct {
 	kvs   kvs
@@ -34,14 +35,14 @@ func newLeafNode(p *interiorNode) *leafNode {
 // If the key does not exist in the node, it returns index to
 // insert the key (the index of the smallest key in the node that larger
 // than the given key) and false.
-func (l *leafNode) find(key int) (int, bool) {
+func (l *leafNode) find(key []byte) (int, bool) {
 	c := func(i int) bool {
-		return l.kvs[i].key >= key
+		return bytes.Compare(l.kvs[i].key, key) >= 0
 	}
 
 	i := sort.Search(l.count, c)
 
-	if i < l.count && l.kvs[i].key == key {
+	if i < l.count && bytes.Compare(l.kvs[i].key, key) == 0 {
 		return i, true
 	}
 
@@ -49,7 +50,7 @@ func (l *leafNode) find(key int) (int, bool) {
 }
 
 // insert
-func (l *leafNode) insert(key int, value string) (int, bool) {
+func (l *leafNode) insert(key []byte, value []byte) ([]byte, bool) {
 	i, ok := l.find(key)
 
 	if ok {
@@ -68,7 +69,7 @@ func (l *leafNode) insert(key int, value string) (int, bool) {
 
 	next := l.split()
 
-	if key < next.kvs[0].key {
+	if bytes.Compare(key, next.kvs[0].key) < 0 {
 		l.insert(key, value)
 	} else {
 		next.insert(key, value)

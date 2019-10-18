@@ -12,7 +12,7 @@ func TestInsert(t *testing.T) {
 
 	start := time.Now()
 	for i := testCount; i > 0; i-- {
-		bt.Insert(i, "")
+		bt.Insert(i, nil)
 	}
 	fmt.Println(time.Now().Sub(start))
 
@@ -24,7 +24,7 @@ func TestSearch(t *testing.T) {
 	bt := newBTree()
 
 	for i := testCount; i > 0; i-- {
-		bt.Insert(i, fmt.Sprintf("%d", i))
+		bt.Insert(i, []byte(fmt.Sprintf("%d", i)))
 	}
 
 	start := time.Now()
@@ -33,7 +33,7 @@ func TestSearch(t *testing.T) {
 		if !ok {
 			t.Errorf("search: want = true, got = false")
 		}
-		if v != fmt.Sprintf("%d", i) {
+		if string(v) != fmt.Sprintf("%d", i) {
 			t.Errorf("search: want = %d, got = %s", i, v)
 		}
 	}
