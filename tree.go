@@ -1,19 +1,23 @@
 package bplustree
 
 type BTree struct {
-	root     *interiorNode
-	first    *leafNode
+	db Database
+
+	root  *interiorNode
+	first *leafNode
+
 	leaf     int
 	interior int
 	height   int
 	keyLen   int
 }
 
-func newBTree(keyLen int) *BTree {
+func newBTree(db Database, keyLen int) *BTree {
 	leaf := newLeafNode(nil, keyLen)
 	r := newInteriorNode(nil, leaf, keyLen)
 	leaf.p = r
 	return &BTree{
+		db:       db,
 		root:     r,
 		first:    leaf,
 		leaf:     1,
