@@ -19,19 +19,21 @@ func (a *kcs) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 
 func (a *kcs) Less(i, j int) bool {
 	compare := bytes.Compare(a[i].key, a[j].key)
-	return compare > 0
+	return compare < 0
 }
 
 type interiorNode struct {
-	kcs   kcs
-	count int
-	p     *interiorNode
+	kcs    kcs
+	count  int
+	p      *interiorNode
+	keyLen int
 }
 
-func newInteriorNode(p *interiorNode, largestChild node) *interiorNode {
+func newInteriorNode(p *interiorNode, largestChild node, keyLen int) *interiorNode {
 	i := &interiorNode{
-		p:     p,
-		count: 1,
+		p:      p,
+		count:  1,
+		keyLen: keyLen,
 	}
 
 	if largestChild != nil {
@@ -65,7 +67,7 @@ func (in *interiorNode) insert(key []byte, child node) ([]byte, *interiorNode, b
 		child.setParent(in)
 
 		in.count++
-		return 0, nil, false
+		return nil, nil, false
 	}
 
 	// insert the new node into the empty slot
@@ -87,7 +89,7 @@ func (in *interiorNode) split() (*interiorNode, []byte) {
 	midKey := in.kcs[midIndex].key
 
 	// create the split node with out a parent
-	next := newInteriorNode(nil, nil)
+	next := newInteriorNode(nil, nil, in.keyLen)
 	copy(next.kcs[0:], in.kcs[midIndex+1:])
 	next.count = MaxKC - midIndex
 	// update parent

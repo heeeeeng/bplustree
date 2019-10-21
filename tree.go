@@ -6,11 +6,12 @@ type BTree struct {
 	leaf     int
 	interior int
 	height   int
+	keyLen   int
 }
 
-func newBTree() *BTree {
-	leaf := newLeafNode(nil)
-	r := newInteriorNode(nil, leaf)
+func newBTree(keyLen int) *BTree {
+	leaf := newLeafNode(nil, keyLen)
+	r := newInteriorNode(nil, leaf, keyLen)
 	leaf.p = r
 	return &BTree{
 		root:     r,
@@ -18,6 +19,7 @@ func newBTree() *BTree {
 		leaf:     1,
 		interior: 1,
 		height:   2,
+		keyLen:   keyLen,
 	}
 }
 
@@ -65,7 +67,7 @@ func (bt *BTree) Insert(key []byte, value []byte) {
 
 			midNode = interior
 		} else {
-			bt.root = newInteriorNode(nil, newNode)
+			bt.root = newInteriorNode(nil, newNode, bt.keyLen)
 			newNode.setParent(bt.root)
 
 			bt.root.insert(mid, interior)

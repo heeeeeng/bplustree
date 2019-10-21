@@ -15,18 +15,20 @@ type kvs [MaxKV]kv
 
 func (a *kvs) Len() int           { return len(a) }
 func (a *kvs) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a *kvs) Less(i, j int) bool { return bytes.Compare(a[i].key, a[j].key) > 0 }
+func (a *kvs) Less(i, j int) bool { return bytes.Compare(a[i].key, a[j].key) < 0 }
 
 type leafNode struct {
-	kvs   kvs
-	count int
-	next  *leafNode
-	p     *interiorNode
+	kvs    kvs
+	count  int
+	next   *leafNode
+	p      *interiorNode
+	keyLen int
 }
 
-func newLeafNode(p *interiorNode) *leafNode {
+func newLeafNode(p *interiorNode, keyLen int) *leafNode {
 	return &leafNode{
-		p: p,
+		p:      p,
+		keyLen: keyLen,
 	}
 }
 
@@ -56,7 +58,7 @@ func (l *leafNode) insert(key []byte, value []byte) ([]byte, bool) {
 	if ok {
 		//log.Println("insert.replace", i)
 		l.kvs[i].value = value
-		return 0, false
+		return nil, false
 	}
 
 	if !l.full() {
@@ -64,7 +66,7 @@ func (l *leafNode) insert(key []byte, value []byte) ([]byte, bool) {
 		l.kvs[i].key = key
 		l.kvs[i].value = value
 		l.count++
-		return 0, false
+		return nil, false
 	}
 
 	next := l.split()
@@ -79,7 +81,7 @@ func (l *leafNode) insert(key []byte, value []byte) ([]byte, bool) {
 }
 
 func (l *leafNode) split() *leafNode {
-	next := newLeafNode(nil)
+	next := newLeafNode(nil, l.keyLen)
 
 	copy(next.kvs[0:], l.kvs[l.count/2+1:])
 
