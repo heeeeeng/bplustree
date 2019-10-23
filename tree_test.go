@@ -1,18 +1,27 @@
 package bplustree
 
 import (
+	"bytes"
 	"fmt"
 	"testing"
 	"time"
 )
 
+var (
+	defaultKeyLength = 8
+)
+
+func newMemDB() Database {
+	return NewMemDatabase()
+}
+
 func TestInsert(t *testing.T) {
 	testCount := 1000000
-	bt := newBTree()
+	bt := newBTree(newMemDB(), defaultKeyLength)
 
 	start := time.Now()
 	for i := testCount; i > 0; i-- {
-		bt.Insert(i, nil)
+		bt.Insert(Int64ToBytes(int64(i)), nil)
 	}
 	fmt.Println(time.Now().Sub(start))
 
@@ -21,15 +30,15 @@ func TestInsert(t *testing.T) {
 
 func TestSearch(t *testing.T) {
 	testCount := 1000000
-	bt := newBTree()
+	bt := newBTree(newMemDB(), defaultKeyLength)
 
 	for i := testCount; i > 0; i-- {
-		bt.Insert(i, []byte(fmt.Sprintf("%d", i)))
+		bt.Insert(Int64ToBytes(int64(i)), []byte(fmt.Sprintf("%d", i)))
 	}
 
 	start := time.Now()
 	for i := 1; i < testCount; i++ {
-		v, ok := bt.Search(i)
+		v, ok := bt.Search(Int64ToBytes(int64(i)))
 		if !ok {
 			t.Errorf("search: want = true, got = false")
 		}
@@ -43,91 +52,87 @@ func TestSearch(t *testing.T) {
 func verifyTree(b *BTree, count int, t *testing.T) {
 	verifyRoot(b, t)
 
-	for i := 0; i < b.root.count; i++ {
-		verifyNode(b.root.kcs[i].child, b.root, t)
+	for i := 0; i < b.root.Count; i++ {
+		verifyNode(b.root.Kcs[i].Child, b.root, t)
 	}
 
 	leftMost := findLeftMost(b.root)
 
 	if leftMost != b.first {
-		t.Errorf("bt.first: want = %p, got = %p", b.first, leftMost)
+		t.Errorf("bt.first: want = %s, \ngot = %s", b.first.Kvs.String(), leftMost.Kvs.String())
 	}
 
 	verifyLeaf(leftMost, count, t)
 }
 
-// min child: 1
-// max child: MaxKC
+// min Child: 1
+// max Child: MaxKC
 func verifyRoot(b *BTree, t *testing.T) {
 	if b.root.parent() != nil {
 		t.Errorf("root.parent: want = nil, got = %p", b.root.parent())
 	}
 
-	if b.root.count < 1 {
-		t.Errorf("root.min.child: want >=1, got = %d", b.root.count)
+	if b.root.Count < 1 {
+		t.Errorf("root.min.Child: want >=1, got = %d", b.root.Count)
 	}
 
-	if b.root.count > MaxKC {
-		t.Errorf("root.max.child: want <= %d, got = %d", MaxKC, b.root.count)
+	if b.root.Count > MaxKC {
+		t.Errorf("root.max.Child: want <= %d, got = %d", MaxKC, b.root.Count)
 	}
 }
 
-func verifyNode(n node, parent *interiorNode, t *testing.T) {
+func verifyNode(n Node, parent *InteriorNode, t *testing.T) {
 	switch nn := n.(type) {
-	case *interiorNode:
-		if nn.count < MaxKC/2 {
-			t.Errorf("interior.min.child: want >= %d, got = %d", MaxKC/2, nn.count)
+	case *InteriorNode:
+		if nn.Count < MaxKC/2 {
+			t.Errorf("interior.min.Child: want >= %d, got = %d", MaxKC/2, nn.Count)
 		}
 
-		if nn.count > MaxKC {
-			t.Errorf("interior.max.child: want <= %d, got = %d", MaxKC, nn.count)
+		if nn.Count > MaxKC {
+			t.Errorf("interior.max.Child: want <= %d, got = %d", MaxKC, nn.Count)
 		}
 
 		if nn.parent() != parent {
 			t.Errorf("interior.parent: want = %p, got = %p", parent, nn.parent())
 		}
 
-		var last int
-		for i := 0; i < nn.count; i++ {
-			key := nn.kcs[i].key
-			if key != 0 && key < last {
-				t.Errorf("interior.sort.key: want > %d, got = %d", last, key)
+		var last []byte
+		for i := 0; i < nn.Count; i++ {
+			key := nn.Kcs[i].Key
+			if key != nil && bytes.Compare(key, last) < 0 {
+				t.Errorf("interior.sort.Key: want > %x, got = %x", last, key)
 			}
 			last = key
 
-			if i == nn.count-1 && key != 0 {
-				t.Errorf("interior.last.key: want = 0, got = %d", key)
-			}
-
-			verifyNode(nn.kcs[i].child, nn, t)
+			verifyNode(nn.Kcs[i].Child, nn, t)
 		}
 
-	case *leafNode:
+	case *LeafNode:
 		if nn.parent() != parent {
 			t.Errorf("leaf.parent: want = %p, got = %p", parent, nn.parent())
 		}
 
-		if nn.count < MaxKV/2 {
-			t.Errorf("leaf.min.child: want >= %d, got = %d", MaxKV/2, nn.count)
+		if nn.Count < MaxKV/2 {
+			t.Errorf("leaf.min.Child: want >= %d, got = %d", MaxKV/2, nn.Count)
 		}
 
-		if nn.count > MaxKV {
-			t.Errorf("leaf.max.child: want <= %d, got = %d", MaxKV, nn.count)
+		if nn.Count > MaxKV {
+			t.Errorf("leaf.max.Child: want <= %d, got = %d", MaxKV, nn.Count)
 		}
 	}
 }
 
-func verifyLeaf(leftMost *leafNode, count int, t *testing.T) {
+func verifyLeaf(leftMost *LeafNode, count int, t *testing.T) {
 	curr := leftMost
-	last := 0
+	var last []byte
 	c := 0
 
 	for curr != nil {
-		for i := 0; i < curr.count; i++ {
-			key := curr.kvs[i].key
+		for i := 0; i < curr.Count; i++ {
+			key := curr.Kvs[i].Key
 
-			if key <= last {
-				t.Errorf("leaf.sort.key: want > %d, got = %d", last, key)
+			if bytes.Compare(key, last) <= 0 {
+				t.Errorf("leaf.sort.Key: want > %x, got = %x", last, key)
 			}
 			last = key
 			c++
@@ -136,15 +141,15 @@ func verifyLeaf(leftMost *leafNode, count int, t *testing.T) {
 	}
 
 	if c != count {
-		t.Errorf("leaf.count: want = %d, got = %d", count, c)
+		t.Errorf("leaf.Count: want = %d, got = %d", count, c)
 	}
 }
 
-func findLeftMost(n node) *leafNode {
+func findLeftMost(n Node) *LeafNode {
 	switch nn := n.(type) {
-	case *interiorNode:
-		return findLeftMost(nn.kcs[0].child)
-	case *leafNode:
+	case *InteriorNode:
+		return findLeftMost(nn.Kcs[0].Child)
+	case *LeafNode:
 		return nn
 	default:
 		panic("")

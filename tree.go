@@ -3,8 +3,8 @@ package bplustree
 type BTree struct {
 	db Database
 
-	root  *interiorNode
-	first *leafNode
+	root  *InteriorNode
+	first *LeafNode
 
 	leaf     int
 	interior int
@@ -15,7 +15,7 @@ type BTree struct {
 func newBTree(db Database, keyLen int) *BTree {
 	leaf := newLeafNode(nil, keyLen)
 	r := newInteriorNode(nil, leaf, keyLen)
-	leaf.p = r
+	leaf.P = r
 	return &BTree{
 		db:       db,
 		root:     r,
@@ -27,12 +27,12 @@ func newBTree(db Database, keyLen int) *BTree {
 	}
 }
 
-// first returns the first leafNode
-func (bt *BTree) First() *leafNode {
+// first returns the first LeafNode
+func (bt *BTree) First() *LeafNode {
 	return bt.first
 }
 
-// insert inserts a (key, value) into the B+ tree
+// insert inserts a (Key, Value) into the B+ tree
 func (bt *BTree) Insert(key []byte, value []byte) {
 	_, oldIndex, leaf := search(bt.root, key)
 	p := leaf.parent()
@@ -42,17 +42,17 @@ func (bt *BTree) Insert(key []byte, value []byte) {
 		return
 	}
 
-	var midNode node
+	var midNode Node
 	midNode = leaf
 
-	p.kcs[oldIndex].child = leaf.next
+	p.Kcs[oldIndex].Child = leaf.next
 	leaf.next.setParent(p)
 
 	interior, interiorP := p, p.parent()
 
 	for {
 		var oldIndex int
-		var newNode *interiorNode
+		var newNode *InteriorNode
 
 		isRoot := interiorP == nil
 
@@ -66,7 +66,7 @@ func (bt *BTree) Insert(key []byte, value []byte) {
 		}
 
 		if !isRoot {
-			interiorP.kcs[oldIndex].child = newNode
+			interiorP.Kcs[oldIndex].Child = newNode
 			newNode.setParent(interiorP)
 
 			midNode = interior
@@ -82,32 +82,43 @@ func (bt *BTree) Insert(key []byte, value []byte) {
 	}
 }
 
-// Search searches the key in B+ tree
-// If the key exists, it returns the value of key and true
-// If the key does not exist, it returns an empty string and false
+// Search searches the Key in B+ tree
+// If the Key exists, it returns the Value of Key and true
+// If the Key does not exist, it returns an empty string and false
 func (bt *BTree) Search(key []byte) ([]byte, bool) {
 	kv, _, _ := search(bt.root, key)
 	if kv == nil {
 		return nil, false
 	}
-	return kv.value, true
+	return kv.Value, true
 }
 
-func search(n node, key []byte) (*kv, int, *leafNode) {
+// String marshal the tree to a string
+// This is for debug only.
+func (bt *BTree) String() string {
+	s := ""
+
+	s += bt.root.Kcs.String()
+	for
+
+	return s
+}
+
+func search(n Node, key []byte) (*KV, int, *LeafNode) {
 	curr := n
 	oldIndex := -1
 
 	for {
 		switch t := curr.(type) {
-		case *leafNode:
+		case *LeafNode:
 			i, ok := t.find(key)
 			if !ok {
 				return nil, oldIndex, t
 			}
-			return &t.kvs[i], oldIndex, t
-		case *interiorNode:
+			return &t.Kvs[i], oldIndex, t
+		case *InteriorNode:
 			i, _ := t.find(key)
-			curr = t.kcs[i].child
+			curr = t.Kcs[i].Child
 			oldIndex = i
 		default:
 			panic("")
