@@ -20,8 +20,16 @@ func TestInsert(t *testing.T) {
 	bt := newBTree(newMemDB(), defaultKeyLength)
 
 	start := time.Now()
+	oldLeafNum := bt.leaf
+	oldInterNum := bt.interior
 	for i := testCount; i > 0; i-- {
 		bt.Insert(Int64ToBytes(int64(i)), nil)
+		if bt.leaf != oldLeafNum {
+			oldLeafNum = bt.leaf
+		}
+		if bt.interior != oldInterNum {
+			oldInterNum = bt.interior
+		}
 	}
 	fmt.Println(time.Now().Sub(start))
 

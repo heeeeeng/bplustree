@@ -41,6 +41,7 @@ func (bt *BTree) Insert(key []byte, value []byte) {
 	if !bump {
 		return
 	}
+	bt.leaf++
 
 	var midNode Node
 	midNode = leaf
@@ -64,6 +65,7 @@ func (bt *BTree) Insert(key []byte, value []byte) {
 		if !bump {
 			return
 		}
+		bt.interior++
 
 		if !isRoot {
 			interiorP.Kcs[oldIndex].Child = newNode
@@ -75,6 +77,8 @@ func (bt *BTree) Insert(key []byte, value []byte) {
 			newNode.setParent(bt.root)
 
 			bt.root.insert(mid, interior)
+			bt.interior++
+			bt.height++
 			return
 		}
 
@@ -98,8 +102,8 @@ func (bt *BTree) Search(key []byte) ([]byte, bool) {
 func (bt *BTree) String() string {
 	s := ""
 
-	s += bt.root.Kcs.String()
-	for
+	//s += bt.root.Kcs.String()
+	//for
 
 	return s
 }

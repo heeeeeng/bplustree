@@ -109,6 +109,10 @@ func (l *LeafNode) split() *LeafNode {
 	return next
 }
 
+func (l *LeafNode) count() int { return l.Count }
+
+func (l *LeafNode) largestKey() []byte { return l.Kvs[l.count()-1].Key }
+
 func (l *LeafNode) full() bool { return l.Count == MaxKV }
 
 func (l *LeafNode) parent() *InteriorNode { return l.P }

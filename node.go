@@ -8,10 +8,12 @@ const (
 )
 
 type Node interface {
+	count() int
 	find(key []byte) (int, bool)
 	parent() *InteriorNode
 	setParent(*InteriorNode)
 	full() bool
+	largestKey() []byte
 	encode() (key []byte, value []byte)
 	decode(data []byte)
 

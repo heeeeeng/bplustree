@@ -51,6 +51,16 @@ func newInteriorNode(p *InteriorNode, largestChild Node, keyLen int) *InteriorNo
 	}
 
 	if largestChild != nil {
+		var key []byte
+		if largestChild.count() > 0 {
+			key = largestChild.largestKey()
+		} else {
+			key = make([]byte, keyLen)
+			for i := 0; i < keyLen; i++ {
+				key[i] = byte(255)
+			}
+		}
+		i.Kcs[0].Key = key
 		i.Kcs[0].Child = largestChild
 	}
 	return i
@@ -63,6 +73,10 @@ func (in *InteriorNode) find(key []byte) (int, bool) {
 
 	return i, true
 }
+
+func (in *InteriorNode) count() int { return in.Count }
+
+func (in *InteriorNode) largestKey() []byte { return in.Kcs[in.count()-1].Key }
 
 func (in *InteriorNode) full() bool { return in.Count == MaxKC }
 
@@ -119,9 +133,10 @@ func (in *InteriorNode) split() (*InteriorNode, []byte) {
 }
 
 func (in *InteriorNode) String() string {
-	s := in.Kcs.String()
+	s := "【 " + in.Kcs.String() + " 】\t"
 
 	//TODO
+
 	//for _, kc := range in.Kcs {
 	//
 	//}
