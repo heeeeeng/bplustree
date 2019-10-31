@@ -41,7 +41,7 @@ func (bt *BTree) First() *LeafNode {
 
 // insert inserts a (Key, Value) into the B+ tree
 func (bt *BTree) Insert(key []byte, value []byte) {
-	_, oldIndex, leaf := search(bt.root, key, true)
+	_, oldIndex, _, leaf := search(bt.root, key, true)
 	p := leaf.parent()
 
 	mid, bump := leaf.insert(key, value)
@@ -97,7 +97,7 @@ func (bt *BTree) Insert(key []byte, value []byte) {
 // If the Key exists, it returns the Value of Key and true
 // If the Key does not exist, it returns an empty string and false
 func (bt *BTree) Search(key []byte) ([]byte, bool) {
-	kv, _, _ := search(bt.root, key, true)
+	kv, _, _, _ := search(bt.root, key, true)
 	if kv == nil {
 		return nil, false
 	}
@@ -157,7 +157,7 @@ func (bt *BTree) String() string {
 	return s
 }
 
-func search(n Node, key []byte, exact bool) (*KV, int, *LeafNode) {
+func search(n Node, key []byte, exact bool) (*KV, int, int, *LeafNode) {
 	curr := n
 	oldIndex := -1
 
@@ -172,9 +172,9 @@ func search(n Node, key []byte, exact bool) (*KV, int, *LeafNode) {
 			}
 			i, ok := explorer(key)
 			if !ok {
-				return nil, oldIndex, t
+				return nil, oldIndex, 0, t
 			}
-			return &t.Kvs.data[i], oldIndex, t
+			return &t.Kvs.data[i], oldIndex, i, t
 		case *InteriorNode:
 			i, _ := t.find(key)
 			curr = t.Kcs.data[i].Child
@@ -188,7 +188,7 @@ func search(n Node, key []byte, exact bool) (*KV, int, *LeafNode) {
 func searchRange(n Node, start, end []byte) []KV {
 	result := make([]KV, 0)
 
-	_, index, leaf := search(n, start, false)
+	_, _, index, leaf := search(n, start, false)
 	for {
 		if leaf == nil {
 			return result
