@@ -9,13 +9,11 @@ import (
 
 //go:generate msgp
 
-//msgp: tuple KV
 type KV struct {
 	Key   []byte
 	Value []byte
 }
 
-//msgp: tuple KVs
 type KVs []KV
 
 func (a KVs) Len() int           { return len(a) }
@@ -32,18 +30,24 @@ func (a KVs) String() string {
 
 //msgp: tuple LeafNode
 type LeafNode struct {
-	Kvs    KVs
-	Count  int
-	P      *InteriorNode
+	Kvs   KVs
+	Count int
+
+	p      *InteriorNode
 	next   *LeafNode
 	keyLen int
+
+	cacheHash []byte
+	cacheData []byte
+	dirty     bool
 }
 
 func newLeafNode(p *InteriorNode, keyLen int) *LeafNode {
 	return &LeafNode{
 		Kvs:    make(KVs, MaxKV),
-		P:      p,
+		p:      p,
 		keyLen: keyLen,
+		dirty:  true,
 	}
 }
 
@@ -68,10 +72,13 @@ func (l *LeafNode) find(key []byte) (int, bool) {
 
 // insert
 func (l *LeafNode) insert(key []byte, value []byte) ([]byte, bool) {
+	defer func(n *LeafNode) {
+		n.dirty = true
+	}(l)
+
 	i, ok := l.find(key)
 
 	if ok {
-		//log.Println("insert.replace", i)
 		l.Kvs[i].Value = value
 		return nil, false
 	}
@@ -111,20 +118,54 @@ func (l *LeafNode) split() *LeafNode {
 
 func (l *LeafNode) count() int { return l.Count }
 
+func (l *LeafNode) isDirty() bool { return l.dirty }
+
+func (l *LeafNode) setDirty(dirty bool) { l.dirty = dirty }
+
+func (l *LeafNode) cache() (bool, []byte, []byte) {
+	return l.dirty, l.cacheHash, l.cacheData
+}
+
 func (l *LeafNode) largestKey() []byte { return l.Kvs[l.count()-1].Key }
 
 func (l *LeafNode) full() bool { return l.Count == MaxKV }
 
-func (l *LeafNode) parent() *InteriorNode { return l.P }
+func (l *LeafNode) parent() *InteriorNode { return l.p }
 
-func (l *LeafNode) setParent(p *InteriorNode) { l.P = p }
+func (l *LeafNode) setParent(p *InteriorNode) { l.p = p }
 
-func (l *LeafNode) encode() (key []byte, value []byte) {
+func (l *LeafNode) encode() (value []byte) {
+	value = make([]byte, 0)
+	value = append(value, prefixLeaf)
+	value = append(value, Int32ToBytes(int32(l.count()))...)
 
-	return
+	for i := 0; i < l.count(); i++ {
+		kv := l.Kvs[i]
+
+		// size for key
+		value = append(value, Int32ToBytes(int32(len(kv.Key)))...)
+		value = append(value, kv.Key...)
+
+		// size for value
+		value = append(value, Int32ToBytes(int32(len(kv.Value)))...)
+		value = append(value, kv.Value...)
+	}
+	return value
 }
 
 func (l *LeafNode) decode(data []byte) {
 
 	return
+}
+
+func (l *LeafNode) MsgSize() (s int) {
+	// prefix (1) + count (4)
+	s = 1 + 4
+	for _, kv := range l.Kvs {
+		// key length
+		s += len(kv.Key)
+		// value length
+		s += len(kv.Value)
+	}
+	return s
 }

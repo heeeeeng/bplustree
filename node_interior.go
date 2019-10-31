@@ -8,13 +8,11 @@ import (
 
 //go:generate msgp
 
-//msgp: tuple KC
 type KC struct {
 	Key   []byte
 	Child Node
 }
 
-//msgp: tuple KCs
 type KCs []KC
 
 func (a KCs) Len() int { return len(a) }
@@ -36,18 +34,24 @@ func (a KCs) String() string {
 
 //msgp: tuple InteriorNode
 type InteriorNode struct {
-	Kcs    KCs
-	Count  int
-	P      *InteriorNode
+	Kcs   KCs
+	Count int
+
+	p      *InteriorNode
 	keyLen int
+
+	cacheHash []byte
+	cacheData []byte
+	dirty     bool
 }
 
 func newInteriorNode(p *InteriorNode, largestChild Node, keyLen int) *InteriorNode {
 	i := &InteriorNode{
 		Kcs:    make(KCs, MaxKC+1),
-		P:      p,
+		p:      p,
 		Count:  1,
 		keyLen: keyLen,
+		dirty:  true,
 	}
 
 	if largestChild != nil {
@@ -76,15 +80,27 @@ func (in *InteriorNode) find(key []byte) (int, bool) {
 
 func (in *InteriorNode) count() int { return in.Count }
 
+func (in *InteriorNode) isDirty() bool { return in.dirty }
+
+func (in *InteriorNode) setDirty(dirty bool) { in.dirty = dirty }
+
+func (in *InteriorNode) cache() (bool, []byte, []byte) {
+	return in.dirty, in.cacheHash, in.cacheData
+}
+
 func (in *InteriorNode) largestKey() []byte { return in.Kcs[in.count()-1].Key }
 
 func (in *InteriorNode) full() bool { return in.Count == MaxKC }
 
-func (in *InteriorNode) parent() *InteriorNode { return in.P }
+func (in *InteriorNode) parent() *InteriorNode { return in.p }
 
-func (in *InteriorNode) setParent(p *InteriorNode) { in.P = p }
+func (in *InteriorNode) setParent(p *InteriorNode) { in.p = p }
 
 func (in *InteriorNode) insert(key []byte, child Node) ([]byte, *InteriorNode, bool) {
+	defer func(n *InteriorNode) {
+		n.dirty = true
+	}(in)
+
 	i, _ := in.find(key)
 
 	if !in.full() {
@@ -144,9 +160,25 @@ func (in *InteriorNode) String() string {
 	return s
 }
 
-func (in *InteriorNode) encode() (key []byte, value []byte) {
+func (in *InteriorNode) encode() (value []byte) {
+	value = make([]byte, 0)
+	value = append(value, prefixInterior)
+	value = append(value, Int32ToBytes(int32(in.count()))...)
 
-	return
+	for i := 0; i < in.count(); i++ {
+		kc := in.Kcs[i]
+
+		// key size
+		value = append(value, Int32ToBytes(int32(len(kc.Key)))...)
+		value = append(value, kc.Key...)
+
+		// value size
+		_, childHash, _ := kc.Child.cache()
+		value = append(value, Int32ToBytes(int32(len(childHash)))...)
+		value = append(value, childHash...)
+	}
+
+	return value
 }
 
 func (in *InteriorNode) decode(data []byte) {
