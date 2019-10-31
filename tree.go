@@ -1,10 +1,13 @@
 package bplustree
 
+import "golang.org/x/crypto/sha3"
+
 type BTree struct {
 	db Database
 
-	root  *InteriorNode
-	first *LeafNode
+	root    *InteriorNode
+	first   *LeafNode
+	dirties []*dirtyNode
 
 	leaf     int
 	interior int
@@ -15,7 +18,7 @@ type BTree struct {
 func newBTree(db Database, keyLen int) *BTree {
 	leaf := newLeafNode(nil, keyLen)
 	r := newInteriorNode(nil, leaf, keyLen)
-	leaf.P = r
+	leaf.p = r
 	return &BTree{
 		db:       db,
 		root:     r,
@@ -97,13 +100,47 @@ func (bt *BTree) Search(key []byte) ([]byte, bool) {
 	return kv.Value, true
 }
 
+// Commit flush all the dirty nodes to db.
+func (bt *BTree) Commit() error {
+	if !bt.root.isDirty() {
+		return nil
+	}
+
+	bt.dirties = make([]*dirtyNode, 0)
+	hashNode(bt.root, bt)
+
+	batch := bt.db.NewBatch()
+	for _, dirty := range bt.dirties {
+		batch.Put(dirty.hash, dirty.data)
+		dirty.origin.setDirty(false)
+	}
+	return batch.Write()
+}
+
+func (bt *BTree) appendDirty(key, data []byte, n Node) {
+	bt.dirties = append(bt.dirties, newDirtyNode(key, data, n))
+}
+
+// hash the tree recursively
+func (bt *BTree) hashRc() {
+	if !bt.root.isDirty() {
+		return
+	}
+	hashNode(bt.root, bt)
+}
+
+//hash the tree in a loop
+func (bt *BTree) hashLoop() {
+	// TODO
+}
+
 // String marshal the tree to a string
 // This is for debug only.
 func (bt *BTree) String() string {
 	s := ""
 
-	//s += bt.root.Kcs.String()
-	//for
+	// TODO
+	// not implemented yet.
 
 	return s
 }
@@ -129,3 +166,71 @@ func search(n Node, key []byte) (*KV, int, *LeafNode) {
 		}
 	}
 }
+
+type dirtyNode struct {
+	hash   []byte
+	data   []byte
+	origin Node
+}
+
+func newDirtyNode(key, data []byte, n Node) *dirtyNode {
+	return &dirtyNode{
+		hash:   key,
+		data:   data,
+		origin: n,
+	}
+}
+
+func hashNode(n Node, tree *BTree) []byte {
+	if dirty, hash, _ := n.cache(); !dirty {
+		return hash
+	}
+
+	switch node := n.(type) {
+	case *InteriorNode:
+		for i := 0; i < node.count(); i++ {
+			kc := node.Kcs[i]
+			hashNode(kc.Child, tree)
+		}
+
+		data := node.encode()
+		hash := sha3.Sum256(data)
+
+		node.cacheHash = hash[:]
+		node.cacheData = data
+
+		tree.appendDirty(hash[:], data, node)
+		return hash[:]
+	case *LeafNode:
+		data := node.encode()
+		hash := sha3.Sum256(data)
+
+		node.cacheHash = hash[:]
+		node.cacheData = data
+
+		tree.appendDirty(hash[:], data, node)
+		return hash[:]
+	default:
+		return nil
+	}
+}
+
+//
+//func hashChildren(n Node, tree *BTree) *dirtyNode {
+//
+//	switch node := n.(type) {
+//	case *InteriorNode:
+//		for i := 0; i < node.count(); i++ {
+//			kc := node.Kcs[i]
+//
+//			hashNode(kc.Child, tree)
+//
+//		}
+//	case *LeafNode:
+//
+//	default:
+//
+//	}
+//
+//	return nil
+//}
