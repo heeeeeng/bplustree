@@ -1,6 +1,9 @@
 package bplustree
 
-import "golang.org/x/crypto/sha3"
+import (
+	"bytes"
+	"golang.org/x/crypto/sha3"
+)
 
 type BTree struct {
 	db Database
@@ -100,6 +103,10 @@ func (bt *BTree) Search(key []byte) ([]byte, bool) {
 	return kv.Value, true
 }
 
+func (bt *BTree) SearchRange(start, end []byte) [][]byte {
+	return searchRange(bt.root, start, end)
+}
+
 // Commit flush all the dirty nodes to db.
 func (bt *BTree) Commit() error {
 	if !bt.root.isDirty() {
@@ -169,6 +176,26 @@ func search(n Node, key []byte) (*KV, int, *LeafNode) {
 			panic("")
 		}
 	}
+}
+
+func searchRange(n Node, start, end []byte) [][]byte {
+	result := make([][]byte, 0)
+
+	_, index, leaf := search(n, start)
+	for {
+		if index == leaf.count() {
+			index = 0
+			leaf = leaf.next
+			continue
+		}
+		kv := leaf.Kvs[index]
+		if bytes.Compare(kv.Key, end) > 0 {
+			return result
+		}
+		result = append(result, kv.Value)
+		index++
+	}
+
 }
 
 type dirtyNode struct {
