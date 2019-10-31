@@ -88,9 +88,9 @@ func (db *MemDatabase) Delete(key []byte) error {
 
 func (db *MemDatabase) Close() {}
 
-func (db *MemDatabase) NewBatch() Batch {
-	return &memBatch{db: db}
-}
+//func (db *MemDatabase) NewBatch() Batch {
+//	return &memBatch{db: db}
+//}
 
 func (db *MemDatabase) Len() int { return len(db.db) }
 
