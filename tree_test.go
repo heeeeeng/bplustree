@@ -16,8 +16,10 @@ func newMemDB() Database {
 }
 
 func TestInsert(t *testing.T) {
+	cmpFunc := bytes.Compare
+
 	testCount := 1000000
-	bt := newBTree(newMemDB(), defaultKeyLength)
+	bt := NewBTree(newMemDB(), defaultKeyLength, cmpFunc)
 
 	start := time.Now()
 	oldLeafNum := bt.leaf
@@ -37,8 +39,9 @@ func TestInsert(t *testing.T) {
 }
 
 func TestSearch(t *testing.T) {
+	cmpFunc := bytes.Compare
 	testCount := 1000000
-	bt := newBTree(newMemDB(), defaultKeyLength)
+	bt := NewBTree(newMemDB(), defaultKeyLength, cmpFunc)
 
 	for i := testCount; i > 0; i-- {
 		bt.Insert(Int64ToBytes(int64(i)), []byte(fmt.Sprintf("%d", i)))
@@ -61,7 +64,7 @@ func verifyTree(b *BTree, count int, t *testing.T) {
 	verifyRoot(b, t)
 
 	for i := 0; i < b.root.Count; i++ {
-		verifyNode(b.root.Kcs[i].Child, b.root, t)
+		verifyNode(b.root.Kcs.data[i].Child, b.root, t)
 	}
 
 	leftMost := findLeftMost(b.root)
@@ -106,13 +109,13 @@ func verifyNode(n Node, parent *InteriorNode, t *testing.T) {
 
 		var last []byte
 		for i := 0; i < nn.Count; i++ {
-			key := nn.Kcs[i].Key
-			if key != nil && bytes.Compare(key, last) < 0 {
+			key := nn.Kcs.data[i].Key
+			if key != nil && nn.Kcs.cmpFunc(key, last) < 0 {
 				t.Errorf("interior.sort.Key: want > %x, got = %x", last, key)
 			}
 			last = key
 
-			verifyNode(nn.Kcs[i].Child, nn, t)
+			verifyNode(nn.Kcs.data[i].Child, nn, t)
 		}
 
 	case *LeafNode:
@@ -137,7 +140,7 @@ func verifyLeaf(leftMost *LeafNode, count int, t *testing.T) {
 
 	for curr != nil {
 		for i := 0; i < curr.Count; i++ {
-			key := curr.Kvs[i].Key
+			key := curr.Kvs.data[i].Key
 
 			if bytes.Compare(key, last) <= 0 {
 				t.Errorf("leaf.sort.Key: want > %x, got = %x", last, key)
@@ -156,7 +159,7 @@ func verifyLeaf(leftMost *LeafNode, count int, t *testing.T) {
 func findLeftMost(n Node) *LeafNode {
 	switch nn := n.(type) {
 	case *InteriorNode:
-		return findLeftMost(nn.Kcs[0].Child)
+		return findLeftMost(nn.Kcs.data[0].Child)
 	case *LeafNode:
 		return nn
 	default:

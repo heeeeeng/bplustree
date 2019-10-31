@@ -69,12 +69,12 @@ func newLeafNode(p *InteriorNode, keyLen int, cmpFunc func(key1, key2 []byte) in
 // than the given Key) and false.
 func (l *LeafNode) find(key []byte) (int, bool) {
 	c := func(i int) bool {
-		return bytes.Compare(l.Kvs.data[i].Key, key) >= 0
+		return l.Kvs.cmpFunc(l.Kvs.data[i].Key, key) >= 0
 	}
 
 	i := sort.Search(l.Count, c)
 
-	if i < l.Count && bytes.Compare(l.Kvs.data[i].Key, key) == 0 {
+	if i < l.Count && l.Kvs.cmpFunc(l.Kvs.data[i].Key, key) == 0 {
 		return i, true
 	}
 
@@ -104,7 +104,7 @@ func (l *LeafNode) insert(key []byte, value []byte) ([]byte, bool) {
 
 	next := l.split()
 
-	if bytes.Compare(key, next.Kvs.data[0].Key) < 0 {
+	if l.Kvs.cmpFunc(key, next.Kvs.data[0].Key) < 0 {
 		l.insert(key, value)
 	} else {
 		next.insert(key, value)

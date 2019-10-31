@@ -1,7 +1,6 @@
 package bplustree
 
 import (
-	"bytes"
 	"fmt"
 	"sort"
 )
@@ -81,7 +80,7 @@ func newInteriorNode(p *InteriorNode, largestChild Node, keyLen int, cmpFunc fun
 }
 
 func (in *InteriorNode) find(key []byte) (int, bool) {
-	c := func(i int) bool { return bytes.Compare(in.Kcs.data[i].Key, key) > 0 }
+	c := func(i int) bool { return in.Kcs.cmpFunc(in.Kcs.data[i].Key, key) > 0 }
 
 	i := sort.Search(in.Count-1, c)
 

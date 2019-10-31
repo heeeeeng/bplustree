@@ -1,7 +1,6 @@
 package bplustree
 
 import (
-	"bytes"
 	"golang.org/x/crypto/sha3"
 )
 
@@ -194,7 +193,7 @@ func searchRange(n Node, start, end []byte) [][]byte {
 			continue
 		}
 		kv := leaf.Kvs.data[index]
-		if bytes.Compare(kv.Key, end) > 0 {
+		if leaf.Kvs.cmpFunc(kv.Key, end) > 0 {
 			return result
 		}
 		result = append(result, kv.Value)
