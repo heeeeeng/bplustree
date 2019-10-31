@@ -109,12 +109,16 @@ func (bt *BTree) Commit() error {
 	bt.dirties = make([]*dirtyNode, 0)
 	hashNode(bt.root, bt)
 
-	batch := bt.db.NewBatch()
+	//batch := bt.db.NewBatch()
 	for _, dirty := range bt.dirties {
-		batch.Put(dirty.hash, dirty.data)
+		//batch.Put(dirty.hash, dirty.data)
+		if err := bt.db.Put(dirty.hash, dirty.data); err != nil {
+			return err
+		}
 		dirty.origin.setDirty(false)
 	}
-	return batch.Write()
+	//return batch.Write()
+	return nil
 }
 
 func (bt *BTree) appendDirty(key, data []byte, n Node) {
