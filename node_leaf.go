@@ -79,6 +79,19 @@ func (l *LeafNode) find(key []byte) (int, bool) {
 	return i, false
 }
 
+// findSmallest find the smallest index of a key that larger than input key.
+func (l *LeafNode) findSmallest(key []byte) (int, bool) {
+	c := func(i int) bool {
+		return l.Kvs.cmpFunc(l.Kvs.data[i].Key, key) >= 0
+	}
+
+	i := sort.Search(l.Count, c)
+	if i < l.Count {
+		return i, true
+	}
+	return i, false
+}
+
 // insert
 func (l *LeafNode) insert(key []byte, value []byte) ([]byte, bool) {
 	defer func(n *LeafNode) {

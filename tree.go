@@ -41,7 +41,7 @@ func (bt *BTree) First() *LeafNode {
 
 // insert inserts a (Key, Value) into the B+ tree
 func (bt *BTree) Insert(key []byte, value []byte) {
-	_, oldIndex, leaf := search(bt.root, key)
+	_, oldIndex, leaf := search(bt.root, key, true)
 	p := leaf.parent()
 
 	mid, bump := leaf.insert(key, value)
@@ -97,7 +97,7 @@ func (bt *BTree) Insert(key []byte, value []byte) {
 // If the Key exists, it returns the Value of Key and true
 // If the Key does not exist, it returns an empty string and false
 func (bt *BTree) Search(key []byte) ([]byte, bool) {
-	kv, _, _ := search(bt.root, key)
+	kv, _, _ := search(bt.root, key, true)
 	if kv == nil {
 		return nil, false
 	}
@@ -157,14 +157,20 @@ func (bt *BTree) String() string {
 	return s
 }
 
-func search(n Node, key []byte) (*KV, int, *LeafNode) {
+func search(n Node, key []byte, exact bool) (*KV, int, *LeafNode) {
 	curr := n
 	oldIndex := -1
 
 	for {
 		switch t := curr.(type) {
 		case *LeafNode:
-			i, ok := t.find(key)
+			var explorer func(key []byte) (int, bool)
+			if exact {
+				explorer = t.find
+			} else {
+				explorer = t.findSmallest
+			}
+			i, ok := explorer(key)
 			if !ok {
 				return nil, oldIndex, t
 			}
@@ -182,7 +188,7 @@ func search(n Node, key []byte) (*KV, int, *LeafNode) {
 func searchRange(n Node, start, end []byte) [][]byte {
 	result := make([][]byte, 0)
 
-	_, index, leaf := search(n, start)
+	_, index, leaf := search(n, start, false)
 	for {
 		if leaf == nil {
 			return result
