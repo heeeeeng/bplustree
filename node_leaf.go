@@ -14,15 +14,26 @@ type KV struct {
 	Value []byte
 }
 
-type KVs []KV
+type KVs struct {
+	data    []KV
+	cmpFunc func(key1, key2 []byte) int
+}
 
-func (a KVs) Len() int           { return len(a) }
-func (a KVs) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a KVs) Less(i, j int) bool { return bytes.Compare(a[i].Key, a[j].Key) < 0 }
+func newKVs(maxKV int, cmpFunc func(key1, key2 []byte) int) *KVs {
+	kvs := &KVs{}
+	kvs.data = make([]KV, maxKV)
+	kvs.cmpFunc = cmpFunc
+
+	return kvs
+}
+
+func (a KVs) Len() int           { return len(a.data) }
+func (a KVs) Swap(i, j int)      { a.data[i], a.data[j] = a.data[j], a.data[i] }
+func (a KVs) Less(i, j int) bool { return a.cmpFunc(a.data[i].Key, a.data[j].Key) < 0 }
 
 func (a KVs) String() string {
 	var s string
-	for _, kv := range a {
+	for _, kv := range a.data {
 		s += fmt.Sprintf("%x\t", kv.Key)
 	}
 	return s
@@ -30,7 +41,7 @@ func (a KVs) String() string {
 
 //msgp: tuple LeafNode
 type LeafNode struct {
-	Kvs   KVs
+	Kvs   *KVs
 	Count int
 
 	p      *InteriorNode
@@ -42,9 +53,9 @@ type LeafNode struct {
 	dirty     bool
 }
 
-func newLeafNode(p *InteriorNode, keyLen int) *LeafNode {
+func newLeafNode(p *InteriorNode, keyLen int, cmpFunc func(key1, key2 []byte) int) *LeafNode {
 	return &LeafNode{
-		Kvs:    make(KVs, MaxKV),
+		Kvs:    newKVs(MaxKV, cmpFunc),
 		p:      p,
 		keyLen: keyLen,
 		dirty:  true,
@@ -58,12 +69,12 @@ func newLeafNode(p *InteriorNode, keyLen int) *LeafNode {
 // than the given Key) and false.
 func (l *LeafNode) find(key []byte) (int, bool) {
 	c := func(i int) bool {
-		return bytes.Compare(l.Kvs[i].Key, key) >= 0
+		return bytes.Compare(l.Kvs.data[i].Key, key) >= 0
 	}
 
 	i := sort.Search(l.Count, c)
 
-	if i < l.Count && bytes.Compare(l.Kvs[i].Key, key) == 0 {
+	if i < l.Count && bytes.Compare(l.Kvs.data[i].Key, key) == 0 {
 		return i, true
 	}
 
@@ -79,33 +90,33 @@ func (l *LeafNode) insert(key []byte, value []byte) ([]byte, bool) {
 	i, ok := l.find(key)
 
 	if ok {
-		l.Kvs[i].Value = value
+		l.Kvs.data[i].Value = value
 		return nil, false
 	}
 
 	if !l.full() {
-		copy(l.Kvs[i+1:], l.Kvs[i:l.Count])
-		l.Kvs[i].Key = key
-		l.Kvs[i].Value = value
+		copy(l.Kvs.data[i+1:], l.Kvs.data[i:l.Count])
+		l.Kvs.data[i].Key = key
+		l.Kvs.data[i].Value = value
 		l.Count++
 		return nil, false
 	}
 
 	next := l.split()
 
-	if bytes.Compare(key, next.Kvs[0].Key) < 0 {
+	if bytes.Compare(key, next.Kvs.data[0].Key) < 0 {
 		l.insert(key, value)
 	} else {
 		next.insert(key, value)
 	}
 
-	return next.Kvs[0].Key, true
+	return next.Kvs.data[0].Key, true
 }
 
 func (l *LeafNode) split() *LeafNode {
 	next := newLeafNode(nil, l.keyLen)
 
-	copy(next.Kvs[0:], l.Kvs[l.Count/2+1:])
+	copy(next.Kvs.data[0:], l.Kvs.data[l.Count/2+1:])
 
 	next.Count = MaxKV - l.Count/2 - 1
 	next.next = l.next
@@ -126,7 +137,7 @@ func (l *LeafNode) cache() (bool, []byte, []byte) {
 	return l.dirty, l.cacheHash, l.cacheData
 }
 
-func (l *LeafNode) largestKey() []byte { return l.Kvs[l.count()-1].Key }
+func (l *LeafNode) largestKey() []byte { return l.Kvs.data[l.count()-1].Key }
 
 func (l *LeafNode) full() bool { return l.Count == MaxKV }
 
@@ -140,7 +151,7 @@ func (l *LeafNode) encode() (value []byte) {
 	value = append(value, Int32ToBytes(int32(l.count()))...)
 
 	for i := 0; i < l.count(); i++ {
-		kv := l.Kvs[i]
+		kv := l.Kvs.data[i]
 
 		// size for key
 		value = append(value, Int32ToBytes(int32(len(kv.Key)))...)
@@ -161,7 +172,7 @@ func (l *LeafNode) decode(data []byte) {
 func (l *LeafNode) MsgSize() (s int) {
 	// prefix (1) + count (4)
 	s = 1 + 4
-	for _, kv := range l.Kvs {
+	for _, kv := range l.Kvs.data {
 		// key length
 		s += len(kv.Key)
 		// value length

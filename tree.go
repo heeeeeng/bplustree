@@ -16,11 +16,12 @@ type BTree struct {
 	interior int
 	height   int
 	keyLen   int
+	cmpFunc  func(key1, key2 []byte) int
 }
 
-func NewBTree(db Database, keyLen int) *BTree {
-	leaf := newLeafNode(nil, keyLen)
-	r := newInteriorNode(nil, leaf, keyLen)
+func NewBTree(db Database, keyLen int, cmpFunc func(key1, key2 []byte) int) *BTree {
+	leaf := newLeafNode(nil, keyLen, cmpFunc)
+	r := newInteriorNode(nil, leaf, keyLen, cmpFunc)
 	leaf.p = r
 	return &BTree{
 		db:       db,
@@ -30,6 +31,7 @@ func NewBTree(db Database, keyLen int) *BTree {
 		interior: 1,
 		height:   2,
 		keyLen:   keyLen,
+		cmpFunc:  cmpFunc,
 	}
 }
 
@@ -52,7 +54,7 @@ func (bt *BTree) Insert(key []byte, value []byte) {
 	var midNode Node
 	midNode = leaf
 
-	p.Kcs[oldIndex].Child = leaf.next
+	p.Kcs.data[oldIndex].Child = leaf.next
 	leaf.next.setParent(p)
 
 	interior, interiorP := p, p.parent()
@@ -74,12 +76,12 @@ func (bt *BTree) Insert(key []byte, value []byte) {
 		bt.interior++
 
 		if !isRoot {
-			interiorP.Kcs[oldIndex].Child = newNode
+			interiorP.Kcs.data[oldIndex].Child = newNode
 			newNode.setParent(interiorP)
 
 			midNode = interior
 		} else {
-			bt.root = newInteriorNode(nil, newNode, bt.keyLen)
+			bt.root = newInteriorNode(nil, newNode, bt.keyLen, bt.cmpFunc)
 			newNode.setParent(bt.root)
 
 			bt.root.insert(mid, interior)
@@ -167,10 +169,10 @@ func search(n Node, key []byte) (*KV, int, *LeafNode) {
 			if !ok {
 				return nil, oldIndex, t
 			}
-			return &t.Kvs[i], oldIndex, t
+			return &t.Kvs.data[i], oldIndex, t
 		case *InteriorNode:
 			i, _ := t.find(key)
-			curr = t.Kcs[i].Child
+			curr = t.Kcs.data[i].Child
 			oldIndex = i
 		default:
 			panic("")
@@ -183,12 +185,15 @@ func searchRange(n Node, start, end []byte) [][]byte {
 
 	_, index, leaf := search(n, start)
 	for {
+		if leaf == nil {
+			return result
+		}
 		if index == leaf.count() {
 			index = 0
 			leaf = leaf.next
 			continue
 		}
-		kv := leaf.Kvs[index]
+		kv := leaf.Kvs.data[index]
 		if bytes.Compare(kv.Key, end) > 0 {
 			return result
 		}
@@ -220,7 +225,7 @@ func hashNode(n Node, tree *BTree) []byte {
 	switch node := n.(type) {
 	case *InteriorNode:
 		for i := 0; i < node.count(); i++ {
-			kc := node.Kcs[i]
+			kc := node.Kcs.data[i]
 			hashNode(kc.Child, tree)
 		}
 

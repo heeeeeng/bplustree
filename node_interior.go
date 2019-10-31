@@ -13,20 +13,30 @@ type KC struct {
 	Child Node
 }
 
-type KCs []KC
+type KCs struct {
+	data    []KC
+	cmpFunc func(key1, key2 []byte) int
+}
 
-func (a KCs) Len() int { return len(a) }
+func newKCs(maxKC int, cmpFunc func(key1, key2 []byte) int) *KCs {
+	kcs := &KCs{}
+	kcs.data = make([]KC, maxKC+1)
+	kcs.cmpFunc = cmpFunc
 
-func (a KCs) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+	return kcs
+}
+
+func (a KCs) Len() int { return len(a.data) }
+
+func (a KCs) Swap(i, j int) { a.data[i], a.data[j] = a.data[j], a.data[i] }
 
 func (a KCs) Less(i, j int) bool {
-	compare := bytes.Compare(a[i].Key, a[j].Key)
-	return compare < 0
+	return a.cmpFunc(a.data[i].Key, a.data[j].Key) < 0
 }
 
 func (a KCs) String() string {
 	var s string
-	for _, kc := range a {
+	for _, kc := range a.data {
 		s += fmt.Sprintf("%x\t", kc.Key)
 	}
 	return s
@@ -34,7 +44,7 @@ func (a KCs) String() string {
 
 //msgp: tuple InteriorNode
 type InteriorNode struct {
-	Kcs   KCs
+	Kcs   *KCs
 	Count int
 
 	p      *InteriorNode
@@ -45,9 +55,9 @@ type InteriorNode struct {
 	dirty     bool
 }
 
-func newInteriorNode(p *InteriorNode, largestChild Node, keyLen int) *InteriorNode {
-	i := &InteriorNode{
-		Kcs:    make(KCs, MaxKC+1),
+func newInteriorNode(p *InteriorNode, largestChild Node, keyLen int, cmpFunc func(key1, key2 []byte) int) *InteriorNode {
+	in := &InteriorNode{
+		Kcs:    newKCs(MaxKC, cmpFunc),
 		p:      p,
 		Count:  1,
 		keyLen: keyLen,
@@ -64,14 +74,14 @@ func newInteriorNode(p *InteriorNode, largestChild Node, keyLen int) *InteriorNo
 				key[i] = byte(255)
 			}
 		}
-		i.Kcs[0].Key = key
-		i.Kcs[0].Child = largestChild
+		in.Kcs.data[0].Key = key
+		in.Kcs.data[0].Child = largestChild
 	}
-	return i
+	return in
 }
 
 func (in *InteriorNode) find(key []byte) (int, bool) {
-	c := func(i int) bool { return bytes.Compare(in.Kcs[i].Key, key) > 0 }
+	c := func(i int) bool { return bytes.Compare(in.Kcs.data[i].Key, key) > 0 }
 
 	i := sort.Search(in.Count-1, c)
 
@@ -88,7 +98,7 @@ func (in *InteriorNode) cache() (bool, []byte, []byte) {
 	return in.dirty, in.cacheHash, in.cacheData
 }
 
-func (in *InteriorNode) largestKey() []byte { return in.Kcs[in.count()-1].Key }
+func (in *InteriorNode) largestKey() []byte { return in.Kcs.data[in.count()-1].Key }
 
 func (in *InteriorNode) full() bool { return in.Count == MaxKC }
 
@@ -104,10 +114,10 @@ func (in *InteriorNode) insert(key []byte, child Node) ([]byte, *InteriorNode, b
 	i, _ := in.find(key)
 
 	if !in.full() {
-		copy(in.Kcs[i+1:], in.Kcs[i:in.Count])
+		copy(in.Kcs.data[i+1:], in.Kcs.data[i:in.Count])
 
-		in.Kcs[i].Key = key
-		in.Kcs[i].Child = child
+		in.Kcs.data[i].Key = key
+		in.Kcs.data[i].Child = child
 		child.setParent(in)
 
 		in.Count++
@@ -115,8 +125,8 @@ func (in *InteriorNode) insert(key []byte, child Node) ([]byte, *InteriorNode, b
 	}
 
 	// insert the new Node into the empty slot
-	in.Kcs[MaxKC].Key = key
-	in.Kcs[MaxKC].Child = child
+	in.Kcs.data[MaxKC].Key = key
+	in.Kcs.data[MaxKC].Child = child
 	child.setParent(in)
 
 	next, midKey := in.split()
@@ -125,20 +135,20 @@ func (in *InteriorNode) insert(key []byte, child Node) ([]byte, *InteriorNode, b
 }
 
 func (in *InteriorNode) split() (*InteriorNode, []byte) {
-	sort.Sort(&in.Kcs)
+	sort.Sort(in.Kcs)
 
 	// get the mid info
 	midIndex := MaxKC / 2
-	midChild := in.Kcs[midIndex].Child
-	midKey := in.Kcs[midIndex].Key
+	midChild := in.Kcs.data[midIndex].Child
+	midKey := in.Kcs.data[midIndex].Key
 
 	// create the split Node with out a parent
-	next := newInteriorNode(nil, nil, in.keyLen)
-	copy(next.Kcs[0:], in.Kcs[midIndex+1:])
+	next := newInteriorNode(nil, nil, in.keyLen, in.Kcs.cmpFunc)
+	copy(next.Kcs.data[0:], in.Kcs.data[midIndex+1:])
 	next.Count = MaxKC - midIndex
 	// update parent
 	for i := 0; i < next.Count; i++ {
-		next.Kcs[i].Child.setParent(next)
+		next.Kcs.data[i].Child.setParent(next)
 	}
 
 	// modify the original Node
@@ -166,7 +176,7 @@ func (in *InteriorNode) encode() (value []byte) {
 	value = append(value, Int32ToBytes(int32(in.count()))...)
 
 	for i := 0; i < in.count(); i++ {
-		kc := in.Kcs[i]
+		kc := in.Kcs.data[i]
 
 		// key size
 		value = append(value, Int32ToBytes(int32(len(kc.Key)))...)
