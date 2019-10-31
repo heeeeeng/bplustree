@@ -114,7 +114,7 @@ func (l *LeafNode) insert(key []byte, value []byte) ([]byte, bool) {
 }
 
 func (l *LeafNode) split() *LeafNode {
-	next := newLeafNode(nil, l.keyLen)
+	next := newLeafNode(nil, l.keyLen, l.Kvs.cmpFunc)
 
 	copy(next.Kvs.data[0:], l.Kvs.data[l.Count/2+1:])
 
