@@ -104,7 +104,7 @@ func (bt *BTree) Search(key []byte) ([]byte, bool) {
 	return kv.Value, true
 }
 
-func (bt *BTree) SearchRange(start, end []byte) [][]byte {
+func (bt *BTree) SearchRange(start, end []byte) []KV {
 	return searchRange(bt.root, start, end)
 }
 
@@ -185,8 +185,8 @@ func search(n Node, key []byte, exact bool) (*KV, int, *LeafNode) {
 	}
 }
 
-func searchRange(n Node, start, end []byte) [][]byte {
-	result := make([][]byte, 0)
+func searchRange(n Node, start, end []byte) []KV {
+	result := make([]KV, 0)
 
 	_, index, leaf := search(n, start, false)
 	for {
@@ -202,7 +202,7 @@ func searchRange(n Node, start, end []byte) [][]byte {
 		if leaf.Kvs.cmpFunc(kv.Key, end) > 0 {
 			return result
 		}
-		result = append(result, kv.Value)
+		result = append(result, kv)
 		index++
 	}
 
