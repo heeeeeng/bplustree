@@ -15,7 +15,7 @@ type BTree struct {
 	keyLen   int
 }
 
-func newBTree(db Database, keyLen int) *BTree {
+func NewBTree(db Database, keyLen int) *BTree {
 	leaf := newLeafNode(nil, keyLen)
 	r := newInteriorNode(nil, leaf, keyLen)
 	leaf.p = r
