@@ -15,12 +15,12 @@ type Database interface {
 	//NewBatch() Batch
 }
 
-//// Batch is a write-only database that commits changes to its host database
-//// when Write is called. Batch cannot be used concurrently.
-//type Batch interface {
-//	Putter
-//	ValueSize() int // amount of data in the batch
-//	Write() error
-//	// Reset resets the batch for reuse
-//	Reset()
-//}
+// Batch is a write-only database that commits changes to its host database
+// when Write is called. Batch cannot be used concurrently.
+type Batch interface {
+	Putter
+	ValueSize() int // amount of data in the batch
+	Write() error
+	// Reset resets the batch for reuse
+	Reset()
+}

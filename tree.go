@@ -109,7 +109,7 @@ func (bt *BTree) SearchRange(start, end []byte) []KV {
 }
 
 // Commit flush all the dirty nodes to db.
-func (bt *BTree) Commit() error {
+func (bt *BTree) Commit(batch Batch) error {
 	if !bt.root.isDirty() {
 		return nil
 	}
@@ -120,7 +120,7 @@ func (bt *BTree) Commit() error {
 	//batch := bt.db.NewBatch()
 	for _, dirty := range bt.dirties {
 		//batch.Put(dirty.hash, dirty.data)
-		if err := bt.db.Put(dirty.hash, dirty.data); err != nil {
+		if err := batch.Put(dirty.hash, dirty.data); err != nil {
 			return err
 		}
 		dirty.origin.setDirty(false)
